@@ -14,13 +14,13 @@ export monitor_address="ip4://$monitor_host:$monitor_port"
 export CHR_F1='\x85'
 export CHR_RETURN='\x0d'
 
-function vic() {
+function vmon() {
   echo "$*" | nc $monitor_host $monitor_port
 }
 
 function send_keys() {
   # TODO do we need to set the keyboard buffer size?
-  vic "keybuf $*"
+  vmon "keybuf $*"
 }
 
 if [[ $1 == "cart" && -f "$sargon_cart" ]]; then
