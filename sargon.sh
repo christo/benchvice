@@ -28,7 +28,6 @@ if [[ $1 == "cart" && -f "$sargon_cart" ]]; then
         -cartA "$sargon_cart" \
         >vice.out.log &
 
-    # wait for shit to get real
     echo waiting for cart to boot
     sleep 3
 
@@ -38,7 +37,7 @@ else
         -autostartprgmode 1 \
         "$sargon_prg" \
         >vice.out.log &
-    # wait for shit to get real
+
     echo waiting for prg to load
     sleep 6
 fi
