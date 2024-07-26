@@ -2,6 +2,7 @@
 
 # starts sargon ii on vice vic 20 emulator
 
+#
 export sargon_cart="sargon-a0.crt"
 export sargon_prg="SargonII-2000.prg"
 
@@ -22,7 +23,7 @@ function send_keys() {
   vic "keybuf $*"
 }
 
-if [[ $1 == "cart" ]]; then
+if [[ $1 == "cart" && -f "$sargon_cart" ]]; then
     xvic -remotemonitor -remotemonitoraddress "$monitor_address" \
         -cartA "$sargon_cart" \
         >vice.out.log &
