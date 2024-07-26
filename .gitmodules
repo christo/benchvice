@@ -1,3 +1,6 @@
 [submodule "pyvicemon"]
 	path = pyvicemon
 	url = https://github.com/Galfodo/pyvicemon
+[submodule "vic20-sargon-ii-chess"]
+	path = vic20-sargon-ii-chess
+	url = https://github.com/jamarju/vic20-sargon-ii-chess
