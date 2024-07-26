@@ -10,6 +10,7 @@ The script interacts with Sargon II using the VICE remote montitor with the aim 
 
 For Sargon
 
+* [ ] investigate binary monitor protocol. The text commands appear to have changed a lot over time and parsing natural language output seems brittle
 * [ ] read general game state from memory
     * [ ] initial title screen (hit F1)
     * [ ] Game or Setup prompt
