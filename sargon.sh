@@ -10,9 +10,13 @@ export monitor_port="6510"
 export monitor_host="127.0.0.1"
 export monitor_address="ip4://$monitor_host:$monitor_port"
 
-# character codes for sending to keyboard buffer
+# unprintable character codes for sending to keyboard buffer
 export CHR_F1='\x85'
 export CHR_RETURN='\x0d'
+export CHR_CURSOR_RIGHT='\x1d'
+export CHR_CURSOR_DOWN='\x11'
+
+
 
 function vmon() {
   echo "$*" | nc $monitor_host $monitor_port
@@ -25,6 +29,7 @@ function send_keys() {
 
 if [[ $1 == "cart" && -f "$sargon_cart" ]]; then
     xvic -remotemonitor -remotemonitoraddress "$monitor_address" \
+        -binarymonitor \
         -cartA "$sargon_cart" \
         >vice.out.log &
 
@@ -33,6 +38,7 @@ if [[ $1 == "cart" && -f "$sargon_cart" ]]; then
 
 else
     xvic -remotemonitor -remotemonitoraddress "$monitor_address" \
+        -binarymonitor \
         -memory 8k \
         -autostartprgmode 1 \
         "$sargon_prg" \
@@ -56,6 +62,17 @@ fi
 # f1 is char code 133 (0x85) as specified in Vic-20 manual by $CHR()
 # return is char code 13 (0x0d).
 # Note there is also shift-return: 141 (0x8d)
+
+echo centering screen
+cursor_shift=""
+for ((i=0; i<7; i++)); do
+    cursor_shift+="$CHR_CURSOR_RIGHT"
+done
+
+for ((i=0; i<8; i++)); do
+    cursor_shift+="$CHR_CURSOR_DOWN"
+done
+send_keys $cursor_shift
 
 echo starting game as white on level 0
 send_keys $CHR_F1
