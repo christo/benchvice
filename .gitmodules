@@ -1,0 +1,3 @@
+[submodule "pyvicemon"]
+	path = pyvicemon
+	url = https://github.com/Galfodo/pyvicemon
