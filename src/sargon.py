@@ -53,7 +53,7 @@ def main():
 
     print("centering screen")
     send_keys(CHR_CURSOR_RIGHT * 7 + CHR_CURSOR_DOWN * 8)
-
+    return
     print("starting game as white on level 0")
     send_keys(CHR_F1)
     send_keys("gw0")
@@ -71,9 +71,11 @@ def main():
     print("registers:")
     print(vice_monitor.get_registers())
 
-    print("sleeping before quit")
-    time.sleep(10)
-    send_keys("quit")
+    print(vice_monitor.read_memory(0x2000, 0x2020))
+
+    # print("sleeping before quit")
+    # time.sleep(10)
+    # print(send_keys("quit"))
 
 if __name__ == "__main__":
     main()
