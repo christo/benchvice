@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/usr/bin/env zsh
 
 # starts sargon ii on vice vic 20 emulator
 # depends on nc, xvic (from vice)
@@ -57,10 +57,9 @@ xvic -remotemonitor -remotemonitoraddress "$monitor_address" \
 echo waiting for prg to load
 sleep 6
 echo centering screen
-for ((i=0; i<7; i++)); do
-    send_keys "$CHR_CURSOR_RIGHT$CHR_CURSOR_DOWN"
-done
-send_keys "$CHR_CURSOR_DOWN$CHR_CURSOR_DOWN"
+shift_right=$(printf "%0.s$CHR_CURSOR_RIGHT" {1..7})
+shift_down=$(printf "%0.s$CHR_CURSOR_DOWN" {1..10})
+send_keys "${shift_right}${shift_down}"
 dump_mem_wait "1post_screen_centre.mem"
 echo starting game as white on level 0
 send_keys $CHR_F1
