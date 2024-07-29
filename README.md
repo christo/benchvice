@@ -6,12 +6,19 @@ Programmatic interaction with VICE emulator
 
 The script interacts with Sargon II using the VICE remote montitor with the aim of enabling integration of Sargon with other chess-playing infrastructure.
 
+## Sargon Memory Locations
+
+Screen memory is at `$1e00` which makes reading the board possible, given that it is character mapped graphics and the 2x2 character chess pieces all have a unique top left char. So the top left of the 2x2 characters for each square betrays the piece on the square, including the colour. The board orientation is fixed with white at the bottom.
+
+
+
 ## TODO
 
 For Sargon
 
 * [ ] investigate binary monitor protocol. The text commands appear to have changed a lot over time and parsing natural language output seems brittle
 * [ ] read general game state from memory
+    * [ ] computer is thinking?
     * [ ] initial title screen (hit F1)
     * [ ] Game or Setup prompt
     * [ ] Game: 
@@ -19,13 +26,12 @@ For Sargon
         * [ ] AI level 0-6
     * [ ] Setup: 
         * to specify a board state from which to play
-    * [ ] computer is thinking?
     * [ ] level of difficulty
-    * [ ] board state (pieces on board, captured, have moved etc.)
+    * [x] pieces at each square on board
     * [ ] latest move
-    * [ ] move history
+    * [ ] move history (whether a piece has moved etc.)
 * [ ] read vice state
     * [ ] prg is loading from disk/tape
     * [ ] warp mode? 
-* [ ] screenshot
+* [x] screenshot
 
