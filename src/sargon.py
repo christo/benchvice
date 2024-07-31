@@ -1,11 +1,12 @@
 #!/usr/bin/env python
 
-import os
+import re
 import time
 import socket
 import subprocess
 import vice_monitor
 from enum import Enum
+from vice_connect import vice_read_mem
 
 sargon_prg = "vic20-sargon-ii-chess/PRG/SargonII-2000.prg"
 
@@ -17,6 +18,14 @@ CHR_F1 = '\\x85'
 CHR_RETURN = '\\x0d'
 CHR_CURSOR_RIGHT = '\\x1d'
 CHR_CURSOR_DOWN = '\\x11'
+
+
+SCREEN_START = 0x1e00
+SCREEN_WIDTH = 22
+PIECE_WIDTH_CHARS = 2
+PIECE_HEIGHT_CHARS = 2
+
+ADDR_MOVE_NUM = 0x18
 
 
 class Piece(Enum):
@@ -60,10 +69,6 @@ class Square():
 # square is black, meaning the black piece
 # there will use the outline graphic.
 
-SCREEN_START = 0x1e00
-SCREEN_WIDTH = 22
-PIECE_WIDTH_CHARS = 2
-PIECE_HEIGHT_CHARS = 2
 # petscii/ascii mapping in order:
 # top-left, top-right, bottom-left, bottom-right
 # top left char is unique therefore sufficient to
@@ -99,7 +104,7 @@ TOP_LEFT_SCREEN_CODE = {
     0x2c: Square(Piece.QUEEN, Graphic.OUTLINE, Colour.BLACK),
     0x15: Square(Piece.KING, Graphic.SOLID, Colour.BLACK),
     0x28: Square(Piece.BISHOP, Graphic.OUTLINE, Colour.BLACK),
-    0x09: Square(Piece.KNIGHT, Graphic.SOLID, Colour.BLACK),  # TODO chek this
+    0x09: Square(Piece.KNIGHT, Graphic.SOLID, Colour.BLACK),
     0x1f: Square(Piece.ROOK, Graphic.OUTLINE, Colour.BLACK),
     0x1b: Square(Piece.PAWN, Graphic.OUTLINE, Colour.BLACK),
     0x01: Square(Piece.PAWN, Graphic.SOLID, Colour.BLACK),
@@ -117,10 +122,10 @@ TOP_LEFT_SCREEN_CODE = {
     0x9f: Square(Piece.ROOK, Graphic.OUTLINE, Colour.WHITE)
 }
 
-def build_tl_pieces():
+def build_tl_pieces(ps):
     """makes a pieces dict using just the top left char"""
     tl = {}
-    for k, v in PIECES.items():
+    for k, v in ps.items():
         tl[k[0]] = v
     return tl
 
@@ -153,13 +158,22 @@ def coord_square_colour(coord):
     return Colour.BLACK if (coord[0] + coord[1] + 1) % 2 == 0 else Colour.WHITE
 
 def vmon(command):
+    return vmon_basic(command)
+
+def vmon_basic(command):
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.connect((MON_HOST, MON_PORT))
         # TODO ? does this block or do we need to specify a flag to make it block?
         s.sendall(command.encode('utf-8'))
+        assert s.getblocking()
         data = s.recv(1024)
         return data.decode('utf-8')
 
+def read_mem(start, finish):
+    return vice_read_mem(host, port, start, finish)
+
+def save_mem(filename):
+    return vmon(f"s {filename} 0000 ffff")
 
 def send_keys(keys):
     """
@@ -172,7 +186,7 @@ def send_keys(keys):
 def coord_to_pos(coord):
     return f"{"abcdefgh"[7-coord[0]]}{coord[1]+1}"
 
-TL_PIECES = build_tl_pieces()
+TL_PIECES = build_tl_pieces(PIECES)
 
 def dump_board():
     for r in range(8):
@@ -202,12 +216,17 @@ def quit_vice():
     print(send_keys("quit"))
 
 
-def make_a_move():
-    print("entering white move d2-d4")
-    send_keys(f"d2-d4{CHR_RETURN}")
-    # TODO figure out how to wait for the move to happen
-    print("sleeping")
-    time.sleep(5)
+def sleep(t):
+    print(f"sleeping {t}s")
+    time.sleep(t)
+
+def make_move(move):
+    if re.fullmatch("^[a-hA-H][1-8]-[a-hA-H][1-8]$", move) is None:
+        raise ValueError(f"move {move} not in src-dest form.")
+
+    print(f"entering white move {move}")
+    send_keys(f"{move.lower()}{CHR_RETURN}")
+    sleep(2)
 
 
 def start_game(colour, level):
@@ -216,12 +235,12 @@ def start_game(colour, level):
     print(f"starting game as {colour.name} on level {level}")
     send_keys(CHR_F1)
     send_keys(f"g{"w" if colour == Colour.WHITE else "b"}{level}")
-    time.sleep(1)
+    sleep(1)
 
 
-def shift_screen():
+def shift_screen(right, down):
     print("centering screen")
-    send_keys(CHR_CURSOR_RIGHT * 7 + CHR_CURSOR_DOWN * 8)
+    send_keys(CHR_CURSOR_RIGHT * right + CHR_CURSOR_DOWN * down)
 
 
 def start_sargon_vice():
@@ -235,19 +254,53 @@ def start_sargon_vice():
     ], stdout=open('vice.out.log', 'w'), stderr=open('vice.err.log', 'w'))
     # TODO how do we clean up the process / kill etc?
     print("waiting for prg to load")
-    time.sleep(6)
+    sleep(6)
 
+
+def read1(addr):
+    return int(vice_monitor.read_memory(addr, addr).data[0])
+
+def is_computer_move():
+    # we could assume
+    # human colour is 0x15, whos turn is 0x16 so grab both at once:
+    data = vice_monitor.read_memory(0x15, 0x16).data
+    return not data[0] == data[1]
+
+def warp(is_warp):
+    mode = "on" if is_warp else "off"
+    send_keys(f"warp {mode}")
+
+def await_computer():
+    print("waiting for computer")
+    time.sleep(0.5)
+    while is_computer_move():
+        print(".", end="")
+        time.sleep(0.5)
+    print()
+
+def get_move_number():
+    return read1(ADDR_MOVE_NUM)
 
 def main():
 
     start_sargon_vice()
-    shift_screen()
-    start_game(Colour.WHITE, 0)
+    shift_screen(7, 8)
+    start_game(Colour.WHITE, 2)
 
-    dump_board()
-    make_a_move()
-    time.sleep(2)
-    dump_board()
+    sleep(2)
+    read_mem(0x15, 0x16)
+    return
+
+    # dump_board()
+    make_move("d2-d4")
+
+    await_computer()
+    make_move("c1-f4")
+
+    await_computer()
+
+    make_move("e2-e3")
+    await_computer()
 
     # quit_vice()
 
