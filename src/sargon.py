@@ -155,7 +155,7 @@ def piece_at(position):
     return TL_PIECES[screen_char(position)]
 
 def coord_square_colour(coord):
-    return Colour.BLACK if (coord[0] + coord[1] + 1) % 2 == 0 else Colour.WHITE
+    return Colour.WHITE if (coord[0] + coord[1]) % 2 == 0 else Colour.BLACK
 
 def vmon(command):
     return vmon_basic(command)
