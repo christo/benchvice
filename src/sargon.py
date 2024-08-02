@@ -6,7 +6,7 @@ import socket
 import subprocess
 import vice_monitor
 from enum import Enum
-from vice_connect import vice_read_mem
+# from vice_connect import vice_read_mem
 
 sargon_prg = "vic20-sargon-ii-chess/PRG/SargonII-2000.prg"
 
@@ -250,6 +250,7 @@ def start_sargon_vice():
         "-binarymonitor",
         "-memory", "8k",
         "-autostartprgmode", "1",
+#        "-config", "/Users/christo/src/christo/benchvice/vice.config",
         sargon_prg
     ], stdout=open('vice.out.log', 'w'), stderr=open('vice.err.log', 'w'))
     # TODO how do we clean up the process / kill etc?
@@ -288,7 +289,7 @@ def main():
     start_game(Colour.WHITE, 2)
 
     sleep(2)
-    read_mem(0x15, 0x16)
+    # read_mem(0x15, 0x16)
     return
 
     # dump_board()
