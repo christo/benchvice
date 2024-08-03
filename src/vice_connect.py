@@ -1,14 +1,23 @@
 #!/usr/bin/env python
 
+from abc import ABC, abstractmethod
 import socket
 import struct
 
 # binary monitor interface with partial command implementation
+# see vice manual section 12 https://vice-emu.sourceforge.io/vice_12.html
 
 # TODO need to make socket connection asynchronous
 
 API_START = 2
 API_VERSION = 2
+
+
+# TODO send_keys
+# TODO save_mem filename
+# TODO screenshot filename?
+# TODO save_snapshot
+# TODO load_snapshot
 
 CMD_MEMORY_GET = 0x01
 CMD_DUMP = 0x41
@@ -22,21 +31,20 @@ MEM_SIDE_FX_NONE = 0
 MEM_SPACE_MAIN = 0
 
 # monitor response types
-MON_RESPONSE_INVALID = 0x00
-MON_RESPONSE_REGISTER_INFO = 0x31
-MON_RESPONSE_STOPPED = 0x62
-
+RES_INVALID = 0x00
+RES_REGISTER_INFO = 0x31
+RES_STOPPED = 0x62
 
 RESPONSE_NAMES = {
-    MON_RESPONSE_INVALID: "invalid response",
-    MON_RESPONSE_REGISTER_INFO: "register response",
-    MON_RESPONSE_STOPPED: "stopped response"
+    RES_INVALID: "invalid response",
+    RES_REGISTER_INFO: "register response",
+    RES_STOPPED: "stopped response"
 }
 
 # a response arriving with this request id originated from an internal event
 REQ_ID_EVENT = struct.unpack("<I", b'\xff\xff\xff\xff')[0]
 
-err_none = 0x00
+ERR_NONE = 0x00
 ERR_MESG = {
     0x00: "OK, everything worked",
     0x01: "The object you are trying to get or set doesn't exist.",
@@ -49,7 +57,58 @@ ERR_MESG = {
 
 }
 
+# non-threadsafe monotonically increasing sequence number
 request_id = 0
+
+class SocketPair(ABC):
+
+    @abstractmethod
+    def connect(self, host, port):
+        pass
+
+    @abstractmethod
+    def read(self, length):
+        pass
+
+    @abstractmethod
+    def write(self, data):
+        pass
+
+    @abstractmethod
+    def command(self, data):
+        pass
+
+class AsyncSocketPair(SocketPair):
+
+    def connect(self, host, port):
+        pass
+
+    def read(self, length):
+        pass
+
+    def write(self, data):
+        pass
+
+    def command(self, data):
+        pass
+
+    def __init__(self):
+        super().__init__()
+
+
+class SyncSocketPair(SocketPair):
+
+    def connect(self, host, port):
+        pass
+
+    def read(self, length):
+        pass
+
+    def write(self, data):
+        pass
+
+    def command(self, data):
+        pass
 
 
 def build_memory_get(from_addr, to_addr):
@@ -62,18 +121,17 @@ def build_memory_get(from_addr, to_addr):
     request_id = request_id + 1
     # format the request packet, everything is little endian
     request = struct.pack(">BBIIBBHHBH",
-                          API_START,  # api start: 8 bit
-                          API_VERSION,  # api version 8 bit
-                          mem_get_req_length,  # body size: 32 bit
-                          request_id,  # request id: 32 bit
-                          CMD_MEMORY_GET,  # command id: 8 bit
-                          MEM_SIDE_FX_NONE,  # side_effects: 8bit
-                          from_addr,  # from_addr: 16 bit
-                          to_addr,  # to_addr: 16 bit
-                          MEM_SPACE_MAIN,  # mem_space: 8 bit
-                          MEM_BANK_CPU)                  # bank_id:16 bit
+                          API_START,            # api start: 8 bit
+                          API_VERSION,          # api version 8 bit
+                          mem_get_req_length,   # body size: 32 bit
+                          request_id,           # request id: 32 bit
+                          CMD_MEMORY_GET,       # command id: 8 bit
+                          MEM_SIDE_FX_NONE,     # side_effects: 8bit
+                          from_addr,            # from_addr: 16 bit
+                          to_addr,              # to_addr: 16 bit
+                          MEM_SPACE_MAIN,       # mem_space: 8 bit
+                          MEM_BANK_CPU)         # bank_id:16 bit
     print(f"mem_get_req_length: {mem_get_req_length}")
-    write_binary_file(request, 'memory_get_req.bin')
     return request
 
 
@@ -81,6 +139,8 @@ def write_binary_file(request, filename):
     with open(filename, 'wb') as file:
         file.write(request)
 
+def hex_n_decimal(value):
+    return f"{hex(value)} ({value})"
 
 def get_vice_memory_contents_binary(host: str, port: int, from_addr: int, to_addr: int) -> bytes:
     """
@@ -110,34 +170,27 @@ def get_vice_memory_contents_binary(host: str, port: int, from_addr: int, to_add
         # error code: 8 bit
         # request id: 32 bit
         (magic, ver, resp_length, response_type, error_code, resp_req_id) = struct.unpack("<BBIBBI", header)
-        print(f"magic/version: {magic}/{ver}")
-        print(f"resp_length: {hex(resp_length)} ({resp_length})")
-        print(f"response_type: {hex(response_type)} ({RESPONSE_NAMES[response_type]})")
-        print(f"error_code: {error_code} ({ERR_MESG[error_code]})")
-        print(f"resp_req_id: {hex(resp_req_id)}")
+        print(f" magic/version: {magic}/{ver}")
+        print(f" resp_length: {hex_n_decimal(resp_length)}")
+        print(f" response_type: {hex(response_type)} ({RESPONSE_NAMES[response_type]})")
+        print(f" error_code: {error_code} ({ERR_MESG[error_code]})")
+        print(f" resp_req_id: {hex(resp_req_id)}")
         if magic != API_START or ver != API_VERSION:
             # TODO skip over unrelated responses. 3 responses received:
             # 1. register get with id 0xffffff
             # 2. response stopped with id 0xffffff
             # 3. response with expected id
             raise ValueError("weird response packet")
-        elif error_code != err_none:
+        elif error_code != ERR_NONE:
             raise ValueError(ERR_MESG[error_code])
         return magic, ver, resp_length, response_type, error_code, resp_req_id
 
-    def parse_response_header(sockt):
-        print(f"about to read {response_header_length} bytes")
-        header = sockt.recv(response_header_length)
-        return parse_response_header_actual(header)
-
     def read_body(sockt, resp_length):
-        # Read the body
-        print("about to read the body, so excited!!11")
+        # TODO move into socket read
         body = sockt.recv(resp_length)
         while len(body) < resp_length:
-            print(f"so far read {len(body)}")
+            print(f" ...read {len(body)}")
             body += sockt.recv(length - len(body))
-        print("finished reading body, returning")
         return body
 
     def receive_response(sockt):
@@ -152,40 +205,35 @@ def get_vice_memory_contents_binary(host: str, port: int, from_addr: int, to_add
         # then read the body
         # body: response_body_length
         response = 1
-        print(f"\nreading response {response}")
-        magic, ver, body_len, response_type, error_code, resp_req_id = parse_response_header(sockt)
-        while resp_req_id == REQ_ID_EVENT:
-            print("got response for event request id, throwing away body. NEXT!")
+        body = b''
+        event_response = True
+        while event_response:
+            print(f"\nresponse {response} reading {response_header_length} header bytes")
+            header = sockt.recv(response_header_length)
+            magic, ver, body_len, response_type, error_code, resp_req_id = parse_response_header_actual(header)
+            event_response = resp_req_id == REQ_ID_EVENT
             if body_len > 0:
-                print(f"body: {read_body(sockt, body_len)}")
-            else:
-                raise ValueError("apparently socket is closed, losing my shit now")
+                # reading body bytes but it's not the droids we're looking for
+                body = read_body(sockt, body_len)
+                print(f" body: {body}")
+            if not event_response and resp_req_id != request_id:
+                raise ValueError(f"got response for request {resp_req_id} expected {request_id}")
             response = response + 1
-            print(f"\nreading response {response}")
-            magic, ver, body_len, response_type, error_code, resp_req_id = parse_response_header(sockt)
-        print(f"got response for id {hex(resp_req_id)}")
-        body = read_body(sockt, body_len)
-        if resp_req_id != request_id:
-            raise ValueError(f"got response for unexpected request id: {resp_req_id} expected {request_id} or {REQ_ID_EVENT}")
 
-        # body format:
-        # length of memory segment: 16 bit
-        # memory at address from_addr + n for each n: n+1 bytes
+        # response body format for get memory:
+        # length of memory segment: 2 bytes
+        # value at memory address from_addr + n for each n: n+1 bytes
         return body
 
-    # Connect to the VICE binary monitor
+    # TODO move this implementation to SyncSocketPair.command
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
         sock.connect((host, port))
         request = build_memory_get(from_addr, to_addr)
+        write_binary_file(request, 'memory_get_req.bin')
         sock.sendall(request)
         return receive_response(sock)
 
 
-# TODO send_keys
-# TODO save_mem filename
-# TODO screenshot filename
-# TODO save_snapshot
-# TODO load_snapshot
 
 def main():
     resp = get_vice_memory_contents_binary("127.0.0.1", 6502, 15, 16)
