@@ -111,11 +111,11 @@ class SyncSocketPair(SocketPair):
         pass
 
 
-def build_memory_get(from_addr, to_addr):
+def cmd_memory_get(from_addr, to_addr):
 
     # length of request body is fixed for memory get
     # side effects (1), from addr (2), to addr (2), memspace (1), bank_id (2)
-    mem_get_req_length = 1 + 2 + 2 + 1 + 2
+    body_length = 1 + 2 + 2 + 1 + 2
 
     global request_id
     request_id = request_id + 1
@@ -123,7 +123,7 @@ def build_memory_get(from_addr, to_addr):
     request = struct.pack(">BBIIBBHHBH",
                           API_START,            # api start: 8 bit
                           API_VERSION,          # api version 8 bit
-                          mem_get_req_length,   # body size: 32 bit
+                          body_length,          # body length: 32 bit
                           request_id,           # request id: 32 bit
                           CMD_MEMORY_GET,       # command id: 8 bit
                           MEM_SIDE_FX_NONE,     # side_effects: 8bit
@@ -132,6 +132,17 @@ def build_memory_get(from_addr, to_addr):
                           MEM_SPACE_MAIN,       # mem_space: 8 bit
                           MEM_BANK_CPU)         # bank_id:16 bit
     return request
+
+
+def cmd_exit():
+    global request_id
+    request_id = request_id + 1
+    request = struct.pack(">BBIIB",
+                          API_START,            # api start: 8 bit
+                          API_VERSION,          # api version 8 bit
+                          0,                    # body size: 32 bit
+                          request_id,           # request id: 32 bit
+                          CMD_EXIT)             # command id: 8 bit
 
 
 def write_binary_file(data, filename):
@@ -156,7 +167,7 @@ def get_vice_memory_contents_binary(host: str, port: int, from_addr: int, to_add
     if not 0 <= from_addr <= to_addr <= 0xffff:
         raise ValueError("start and finish must be in range 0x0-0xffff and start <= finish")
 
-    def parse_response_header(header):
+    def parse_res_header(header):
         actual_len_header = len(header)
         if (actual_len_header == 0):
             raise ValueError("Socket was closed :(")
@@ -201,11 +212,11 @@ def get_vice_memory_contents_binary(host: str, port: int, from_addr: int, to_add
         # body: response_body_length
         response = 1
         body = b''
-        event_response = True
+        event_response = True   # keep reading until we find a response for a normal request
         while event_response:
             print(f"\nresponse {response} reading {response_header_length} header bytes")
             header = sockt.recv(response_header_length)
-            magic, ver, body_len, response_type, error_code, resp_req_id = parse_response_header(header)
+            magic, ver, body_len, response_type, error_code, resp_req_id = parse_res_header(header)
             event_response = resp_req_id == REQ_ID_EVENT
             if body_len > 0:
                 # reading body bytes but it's not the droids we're looking for
@@ -222,8 +233,9 @@ def get_vice_memory_contents_binary(host: str, port: int, from_addr: int, to_add
 
     # TODO move this implementation to SyncSocketPair.command
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        sock.settimeout(10)
         sock.connect((host, port))
-        request = build_memory_get(from_addr, to_addr)
+        request = cmd_memory_get(from_addr, to_addr)
         write_binary_file(request, 'memory_get_req.bin')
         sock.sendall(request)
         return receive_response(sock)
