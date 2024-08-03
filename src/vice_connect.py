@@ -156,11 +156,11 @@ def get_vice_memory_contents_binary(host: str, port: int, from_addr: int, to_add
     if not 0 <= from_addr <= to_addr <= 0xffff:
         raise ValueError("start and finish must be in range 0x0-0xffff and start <= finish")
 
-    def parse_response_header_actual(header):
+    def parse_response_header(header):
         actual_len_header = len(header)
         if (actual_len_header == 0):
             raise ValueError("Socket was closed :(")
-        if len(header) < response_header_length:
+        if actual_len_header < response_header_length:
             raise ValueError(f"Incomplete response header: {len(header)} bytes")
         # api start: 8 bit
         # api version 8 bit
@@ -168,18 +168,14 @@ def get_vice_memory_contents_binary(host: str, port: int, from_addr: int, to_add
         # response type: 8 bit
         # error code: 8 bit
         # request id: 32 bit
-        (magic, ver, resp_length, response_type, error_code, resp_req_id) = struct.unpack("<BBIBBI", header)
+        magic, ver, resp_length, response_type, error_code, resp_req_id = struct.unpack("<BBIBBI", header)
         print(f" magic/version: {magic}/{ver}")
         print(f" resp_length: {hex_n_decimal(resp_length)}")
         print(f" response_type: {hex(response_type)} ({RESPONSE_NAMES[response_type]})")
         print(f" error_code: {error_code} ({ERR_MESG[error_code]})")
         print(f" resp_req_id: {hex(resp_req_id)}")
         if magic != API_START or ver != API_VERSION:
-            # TODO skip over unrelated responses. 3 responses received:
-            # 1. register get with id 0xffffff
-            # 2. response stopped with id 0xffffff
-            # 3. response with expected id
-            raise ValueError("weird response packet")
+            raise ValueError("scuffed response packet")
         elif error_code != ERR_NONE:
             raise ValueError(ERR_MESG[error_code])
         return magic, ver, resp_length, response_type, error_code, resp_req_id
@@ -209,7 +205,7 @@ def get_vice_memory_contents_binary(host: str, port: int, from_addr: int, to_add
         while event_response:
             print(f"\nresponse {response} reading {response_header_length} header bytes")
             header = sockt.recv(response_header_length)
-            magic, ver, body_len, response_type, error_code, resp_req_id = parse_response_header_actual(header)
+            magic, ver, body_len, response_type, error_code, resp_req_id = parse_response_header(header)
             event_response = resp_req_id == REQ_ID_EVENT
             if body_len > 0:
                 # reading body bytes but it's not the droids we're looking for
