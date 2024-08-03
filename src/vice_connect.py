@@ -131,13 +131,12 @@ def build_memory_get(from_addr, to_addr):
                           to_addr,              # to_addr: 16 bit
                           MEM_SPACE_MAIN,       # mem_space: 8 bit
                           MEM_BANK_CPU)         # bank_id:16 bit
-    print(f"mem_get_req_length: {mem_get_req_length}")
     return request
 
 
-def write_binary_file(request, filename):
+def write_binary_file(data, filename):
     with open(filename, 'wb') as file:
-        file.write(request)
+        file.write(data)
 
 def hex_n_decimal(value):
     return f"{hex(value)} ({value})"
