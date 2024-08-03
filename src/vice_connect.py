@@ -10,25 +10,31 @@ import struct
 API_START = 2
 API_VERSION = 2
 
-cmd_memory_get = 0x01
-cmd_dump = 0x41
-cmd_undump = 0x42
-cmd_keybuf = 0x72
-cmd_exit = 0xaa
-cmd_quit = 0xbb
+CMD_MEMORY_GET = 0x01
+CMD_DUMP = 0x41
+CMD_UNDUMP = 0x42
+CMD_KEYBUF = 0x72
+CMD_EXIT = 0xaa
+CMD_QUIT = 0xbb
 
+MEM_BANK_CPU = 0
+MEM_SIDE_FX_NONE = 0
+MEM_SPACE_MAIN = 0
+
+# monitor response types
 MON_RESPONSE_INVALID = 0x00
 MON_RESPONSE_REGISTER_INFO = 0x31
 MON_RESPONSE_STOPPED = 0x62
 
-RESPONSE_TYPE_NAMES = {
+
+RESPONSE_NAMES = {
     MON_RESPONSE_INVALID: "invalid response",
     MON_RESPONSE_REGISTER_INFO: "register response",
     MON_RESPONSE_STOPPED: "stopped response"
 }
 
-
-EVENT_REQ_ID = struct.unpack("<I", b'\xff\xff\xff\xff')[0]
+# a response arriving with this request id originated from an internal event
+REQ_ID_EVENT = struct.unpack("<I", b'\xff\xff\xff\xff')[0]
 
 err_none = 0x00
 ERR_MESG = {
@@ -47,53 +53,33 @@ request_id = 0
 
 
 def build_memory_get(from_addr, to_addr):
-    # everything is little endian (TODO verify)
 
-    # request
-    # api start: 8 bit
-    # api version 8 bit
-    # body size: 32 bit
-    # request id: 32 bit
-    # command id: 8 bit
-    # side_effects: 8bit
-    # from_addr: 16 bit
-    # to_addr: 16 bit
-    # mem_space: 8 bit
-    # bank_id:16 bit
-
-    # response
-    # api start: 8 bit
-    # api version 8 bit
-    # body size: 32 bit
-    # response type: 8 bit
-    # error code: 8 bit
-    # request id: 32 bit
-
-    no_side_effects = 0
-    mem_space_main = 0
     # length of request body is fixed for memory get
-    # side effects byte, from addr, to addr, memspace byte
-    mem_get_req_length = 1 + 2 + 2 + 1
-    bank_id = 0
+    # side effects (1), from addr (2), to addr (2), memspace (1), bank_id (2)
+    mem_get_req_length = 1 + 2 + 2 + 1 + 2
+
     global request_id
     request_id = request_id + 1
-    # format the request packet
+    # format the request packet, everything is little endian
     request = struct.pack(">BBIIBBHHBH",
-                          API_START,
-                          API_VERSION,
-                          mem_get_req_length,
-                          request_id,
-                          cmd_memory_get,
-                          no_side_effects,
-                          from_addr,
-                          to_addr,
-                          mem_space_main,
-                          bank_id)
+                          API_START,  # api start: 8 bit
+                          API_VERSION,  # api version 8 bit
+                          mem_get_req_length,  # body size: 32 bit
+                          request_id,  # request id: 32 bit
+                          CMD_MEMORY_GET,  # command id: 8 bit
+                          MEM_SIDE_FX_NONE,  # side_effects: 8bit
+                          from_addr,  # from_addr: 16 bit
+                          to_addr,  # to_addr: 16 bit
+                          MEM_SPACE_MAIN,  # mem_space: 8 bit
+                          MEM_BANK_CPU)                  # bank_id:16 bit
     print(f"mem_get_req_length: {mem_get_req_length}")
-    print("writing binary request to file memory_get_req.bin")
-    with open('memory_get_req.bin', 'wb') as file:
-        file.write(request)
+    write_binary_file(request, 'memory_get_req.bin')
     return request
+
+
+def write_binary_file(request, filename):
+    with open(filename, 'wb') as file:
+        file.write(request)
 
 
 def get_vice_memory_contents_binary(host: str, port: int, from_addr: int, to_addr: int) -> bytes:
@@ -111,19 +97,22 @@ def get_vice_memory_contents_binary(host: str, port: int, from_addr: int, to_add
     if not 0 <= from_addr <= to_addr <= 0xffff:
         raise ValueError("start and finish must be in range 0x0-0xffff and start <= finish")
 
-    def parse_response_header(sockt):
-        print(f"about to read {response_header_length} bytes")
-        header = sockt.recv(response_header_length)
+    def parse_response_header_actual(header):
         actual_len_header = len(header)
         if (actual_len_header == 0):
             raise ValueError("Socket was closed :(")
         if len(header) < response_header_length:
             raise ValueError(f"Incomplete response header: {len(header)} bytes")
-        magic, ver, resp_length, response_type, error_code, resp_req_id = struct.unpack("<BBIBBI", header)
-        print(f"magic: {magic}")
-        print(f"ver: {ver}")
-        print(f"resp_length: {resp_length}")
-        print(f"response_type: {hex(response_type)} ({RESPONSE_TYPE_NAMES[response_type]})")
+        # api start: 8 bit
+        # api version 8 bit
+        # body size: 32 bit
+        # response type: 8 bit
+        # error code: 8 bit
+        # request id: 32 bit
+        (magic, ver, resp_length, response_type, error_code, resp_req_id) = struct.unpack("<BBIBBI", header)
+        print(f"magic/version: {magic}/{ver}")
+        print(f"resp_length: {hex(resp_length)} ({resp_length})")
+        print(f"response_type: {hex(response_type)} ({RESPONSE_NAMES[response_type]})")
         print(f"error_code: {error_code} ({ERR_MESG[error_code]})")
         print(f"resp_req_id: {hex(resp_req_id)}")
         if magic != API_START or ver != API_VERSION:
@@ -135,6 +124,11 @@ def get_vice_memory_contents_binary(host: str, port: int, from_addr: int, to_add
         elif error_code != err_none:
             raise ValueError(ERR_MESG[error_code])
         return magic, ver, resp_length, response_type, error_code, resp_req_id
+
+    def parse_response_header(sockt):
+        print(f"about to read {response_header_length} bytes")
+        header = sockt.recv(response_header_length)
+        return parse_response_header_actual(header)
 
     def read_body(sockt, resp_length):
         # Read the body
@@ -159,18 +153,20 @@ def get_vice_memory_contents_binary(host: str, port: int, from_addr: int, to_add
         # body: response_body_length
         response = 1
         print(f"\nreading response {response}")
-        magic, ver, resp_length, response_type, error_code, resp_req_id = parse_response_header(sockt)
-        while resp_req_id == EVENT_REQ_ID:
+        magic, ver, body_len, response_type, error_code, resp_req_id = parse_response_header(sockt)
+        while resp_req_id == REQ_ID_EVENT:
             print("got response for event request id, throwing away body. NEXT!")
-            if resp_length > 0:
-                print(f"body: {read_body(sockt, resp_length)}")
+            if body_len > 0:
+                print(f"body: {read_body(sockt, body_len)}")
+            else:
+                raise ValueError("apparently socket is closed, losing my shit now")
             response = response + 1
             print(f"\nreading response {response}")
-            magic, ver, resp_length, response_type, error_code, resp_req_id = parse_response_header(sockt)
+            magic, ver, body_len, response_type, error_code, resp_req_id = parse_response_header(sockt)
         print(f"got response for id {hex(resp_req_id)}")
-        body = read_body(sockt, resp_length)
+        body = read_body(sockt, body_len)
         if resp_req_id != request_id:
-            raise ValueError(f"got response for unexpected request id: {resp_req_id} expected {request_id} or {EVENT_REQ_ID}")
+            raise ValueError(f"got response for unexpected request id: {resp_req_id} expected {request_id} or {REQ_ID_EVENT}")
 
         # body format:
         # length of memory segment: 16 bit
