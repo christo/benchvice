@@ -32,6 +32,7 @@ function dump_mem() {
   vmon "s \"$1\" 0 0000 ffff"
 }
 
+# fancy dump
 function dump_mem_wait() {
   sleep 5
   screenshot "$1.png"
@@ -41,6 +42,8 @@ function dump_mem_wait() {
   sleep 5
 }
 
+# read memory locations holding human colour and current turn colour
+# if they are the same, it's the human's turn
 function is_human_turn() {
   human_current=$( echo "m 15 16" | nc $monitor_host $monitor_port | head -n 1 | cut -c 20,21,23,24)
   human=${human_current[1,2]}
