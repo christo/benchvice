@@ -2,4 +2,5 @@
 
 # starts the sargon python script with PYTHONPATH setup for deps in submodule
 
-PYTHONPATH=.:pyvicemon:$PYTHONPATH src/sargon.py
+SRC_DIR=$(dirname "$0")
+PYTHONPATH=.:pyvicemon:$PYTHONPATH "$SRC_DIR/sargon.py"
