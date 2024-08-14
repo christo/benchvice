@@ -8,16 +8,18 @@ import socket
 import subprocess
 from enum import Enum
 import vice_monitor
+from pathlib import Path
 
 # TODO vice_connect is scuffed
 # from vice_connect import vice_read_mem
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-SARGON_PRG = "vic20-sargon-ii-chess/PRG/SargonII-2000.prg"
-XVIC_CUSTOM = f"{SCRIPT_DIR}/../../../other/github.com/drfiemost/vice-emu/install/bin/xvic"
+SARGON_PRG = Path(f"{SCRIPT_DIR}/../vic20-sargon-ii-chess/PRG/SargonII-2000.prg").resolve()
+XVIC_CUSTOM = Path(f"{SCRIPT_DIR}/../../../other/github.com/drfiemost/vice-emu/install/bin/xvic").resolve()
 XVIC_PATH = "xvic"
 XVIC = XVIC_CUSTOM
 
+# text monitor
 MON_PORT = 6510
 MON_HOST = "127.0.0.1"
 
@@ -27,7 +29,7 @@ CHR_RETURN = '\\x0d'
 CHR_CURSOR_RIGHT = '\\x1d'
 CHR_CURSOR_DOWN = '\\x11'
 
-
+# this is specific to the sargon prg which uses 8k memory
 SCREEN_START = 0x1e00
 SCREEN_WIDTH = 22
 PIECE_WIDTH_CHARS = 2
@@ -130,6 +132,7 @@ TOP_LEFT_SCREEN_CODE = {
     0x9f: Square(Piece.ROOK, Graphic.OUTLINE, Colour.WHITE)
 }
 
+
 def build_tl_pieces(ps):
     """makes a pieces dict using just the top left char"""
     tl = {}
@@ -142,10 +145,12 @@ def position_to_coord(position):
     """converts an algebraic position like a8 to top-left origin numeric grid tuple (0,0)"""
     return "abcdefgh".find(position.lower()[0]), 8 - int(position[1])
 
+
 def ml_sc_pos(position):
     """returns the memory location of the top left of the screen grid for the position"""
     coord = position_to_coord(position)
     return sc_coord(coord)
+
 
 def sc_coord(coord):
     """memory location of tl screen ch for for given board coord"""
@@ -153,17 +158,21 @@ def sc_coord(coord):
     offset_rank = coord[1] * PIECE_HEIGHT_CHARS
     return offset_rank * SCREEN_WIDTH + offset_file + SCREEN_START
 
+
 def screen_char(position):
     """gets the top left char for a given board position"""
     # calculate the memory location fo the top left char for
     # the position and get the screen char for that position
     return TOP_LEFT_SCREEN_CODE[ml_sc_pos(position)]
 
+
 def piece_at(position):
     return TL_PIECES[screen_char(position)]
 
+
 def coord_square_colour(coord):
     return Colour.WHITE if (coord[0] + coord[1]) % 2 == 0 else Colour.BLACK
+
 
 def vmon(command):
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
@@ -175,11 +184,14 @@ def vmon(command):
         data = s.recv(1024)
         return data.decode('utf-8')
 
+
 def read_mem(start, finish):
     return vice_read_mem(host, port, start, finish)
 
+
 def save_mem(filename):
     return vmon(f"s {filename} 0000 ffff")
+
 
 def send_keys(keys):
     """
@@ -190,9 +202,11 @@ def send_keys(keys):
 
 
 def coord_to_pos(coord):
-    return f"{"abcdefgh"[7-coord[0]]}{coord[1]+1}"
+    return f"{"abcdefgh"[7 - coord[0]]}{coord[1] + 1}"
+
 
 TL_PIECES = build_tl_pieces(PIECES)
+
 
 def dump_board():
     for r in range(8):
@@ -206,6 +220,7 @@ def dump_board():
             print(f"{coord_to_pos(coord)} {piece} on {sq.name}")
         print()
 
+
 def dump_board_mem():
     for r in range(8):
         for f in range(8):
@@ -217,6 +232,7 @@ def dump_board_mem():
             piece = TOP_LEFT_SCREEN_CODE[value]
             print(piece)
 
+
 def xvic_running():
     """
     Returns true iff xvic is running.
@@ -227,6 +243,7 @@ def xvic_running():
     else:
         raise ValueError("missing pgrep, can't tell if xvic is running")
 
+
 def quit_vice():
     print(send_keys("quit"))
 
@@ -234,6 +251,7 @@ def quit_vice():
 def sleep(t):
     print(f"sleeping {t}s")
     time.sleep(t)
+
 
 def make_move(move):
     if re.fullmatch("^[a-hA-H][1-8]-[a-hA-H][1-8]$", move) is None:
@@ -265,22 +283,28 @@ def start_sargon_vice():
     """
     if xvic_running():
         raise ValueError("xvic already running")
+
+    config_file = Path(f"{SCRIPT_DIR}/../vice.config").resolve()
+    if not config_file.exists():
+        raise ValueError(f"config file {config_file} does not exist")
+
     subprocess.Popen([
         XVIC, "-remotemonitor",
         "-remotemonitoraddress", f"ip4://{MON_HOST}:{MON_PORT}",
         "-binarymonitor",
         "-memory", "8k",
         "-autostartprgmode", "1",
-        "-config", f"{SCRIPT_DIR}/../vice.config",
+        "-config", config_file,
         SARGON_PRG
     ], stdout=open('vice.out.log', 'w'), stderr=open('vice.err.log', 'w'))
-    print("waiting for prg to load")
+    print(f"waiting for ${SARGON_PRG} to load")
     sleep(6)  # seems to take about 4-5s on my machine with autowarp on
 
 
 def read1(addr):
     """ Reads and returns a single byte value from addr """
     return int(vice_monitor.read_memory(addr, addr).data[0])
+
 
 def is_computer_move():
     """
@@ -293,9 +317,11 @@ def is_computer_move():
     is_cpu = not is_human_move
     return is_cpu
 
+
 def warp(is_warp):
     mode = "on" if is_warp else "off"
     send_keys(f"warp {mode}")
+
 
 def await_computer():
     print("waiting for computer")
@@ -305,11 +331,12 @@ def await_computer():
         time.sleep(0.5)
     print()
 
+
 def get_move_number():
     return read1(ADDR_MOVE_NUM)
 
-def main():
 
+def main():
     if not xvic_running():
         start_sargon_vice()
         shift_screen(7, 8)
