@@ -1,14 +1,22 @@
 #!/usr/bin/env python
 
+import os
 import re
+import sys
 import time
 import socket
 import subprocess
-import vice_monitor
 from enum import Enum
+import vice_monitor
+
+# TODO vice_connect is scuffed
 # from vice_connect import vice_read_mem
 
-sargon_prg = "vic20-sargon-ii-chess/PRG/SargonII-2000.prg"
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+SARGON_PRG = "vic20-sargon-ii-chess/PRG/SargonII-2000.prg"
+XVIC_CUSTOM = f"{SCRIPT_DIR}/../../../other/github.com/drfiemost/vice-emu/install/bin/xvic"
+XVIC_PATH = "xvic"
+XVIC = XVIC_PATH
 
 MON_PORT = 6510
 MON_HOST = "127.0.0.1"
@@ -211,6 +219,15 @@ def dump_board_mem():
             piece = TOP_LEFT_SCREEN_CODE[value]
             print(piece)
 
+def xvic_running():
+    """
+    Returns true iff xvic is running.
+    """
+    if subprocess.run(['which', 'pgrep'], capture_output=True, text=True).returncode == 0:
+        result = subprocess.run(['pgrep', 'xvic'], capture_output=True, text=True)
+        return result.returncode == 0
+    else:
+        raise ValueError("missing pgrep, can't tell if xvic is running")
 
 def quit_vice():
     print(send_keys("quit"))
@@ -244,28 +261,39 @@ def shift_screen(right, down):
 
 
 def start_sargon_vice():
+    """
+    Starts xvic with sargon if it's not running already. Spews if it's already running.
+    :return:
+    """
+    if xvic_running():
+        raise ValueError("xvic already running")
     subprocess.Popen([
-        "xvic", "-remotemonitor",
+        XVIC, "-remotemonitor",
         "-remotemonitoraddress", f"ip4://{MON_HOST}:{MON_PORT}",
         "-binarymonitor",
         "-memory", "8k",
         "-autostartprgmode", "1",
-#        "-config", "/Users/christo/src/christo/benchvice/vice.config",
-        sargon_prg
+        "-config", f"{SCRIPT_DIR}/../vice.config",
+        SARGON_PRG
     ], stdout=open('vice.out.log', 'w'), stderr=open('vice.err.log', 'w'))
-    # TODO how do we clean up the process / kill etc?
     print("waiting for prg to load")
-    sleep(6)
+    sleep(6)  # seems to take about 4-5s on my machine with autowarp on
 
 
 def read1(addr):
+    """ Reads and returns a single byte value from addr """
     return int(vice_monitor.read_memory(addr, addr).data[0])
 
 def is_computer_move():
-    # we could assume
+    """
+    If the game has not started, the behaviour is undefined.
+    :return: true if the computer is thinking
+    """
     # human colour is 0x15, whos turn is 0x16 so grab both at once:
     data = vice_monitor.read_memory(0x15, 0x16).data
-    return not data[0] == data[1]
+    is_human_move = data[0] == data[1]
+    is_cpu = not is_human_move
+    return is_cpu
 
 def warp(is_warp):
     mode = "on" if is_warp else "off"
@@ -273,7 +301,6 @@ def warp(is_warp):
 
 def await_computer():
     print("waiting for computer")
-    time.sleep(0.5)
     while is_computer_move():
         print(".", end="")
         time.sleep(0.5)
@@ -284,18 +311,19 @@ def get_move_number():
 
 def main():
 
-    start_sargon_vice()
-    shift_screen(7, 8)
-    start_game(Colour.WHITE, 2)
+    if not xvic_running():
+        start_sargon_vice()
+        shift_screen(7, 8)
+        start_game(Colour.WHITE, 2)
 
-    sleep(2)
+        sleep(2)
     # read_mem(0x15, 0x16)
-    return
 
     # dump_board()
     make_move("d2-d4")
 
     await_computer()
+
     make_move("c1-f4")
 
     await_computer()
