@@ -1,10 +1,9 @@
 #!/usr/bin/env python
 
-from abc import ABC, abstractmethod
 import asyncio
 import socket
 import struct
-
+from abc import ABC, abstractmethod
 
 # binary monitor interface with partial command implementation
 # see vice manual section 12 https://vice-emu.sourceforge.io/vice_12.html
@@ -13,7 +12,6 @@ import struct
 
 API_START = 2
 API_VERSION = 2
-
 
 # TODO send_keys
 # TODO save_mem filename
@@ -67,6 +65,7 @@ ERR_MESG = {
 
 }
 
+
 class ResponseHeader:
     """Response header fields"""
 
@@ -95,6 +94,7 @@ class AsyncSocketPair(SocketPair):
         self.port = port
 
     def command(self, req_id, req):
+
         async def execute():
             reader, writer = await asyncio.open_connection(self.host, self.port)
 
@@ -107,14 +107,14 @@ class AsyncSocketPair(SocketPair):
                 header = reader.readexactly(header_len)
                 response_header = parse_res_header(header)
                 body = reader.readexactly(response_header.body_len)
-                return body
+                return response_header, body
 
             finally:
                 print('async: closing the connection')
                 writer.close()
                 await writer.wait_closed()
 
-        asyncio.run(execute())
+        return asyncio.run(execute())
 
 
 class SyncSocketPair(SocketPair):
@@ -134,33 +134,38 @@ class SyncSocketPair(SocketPair):
 
 
 def cmd_memory_get(request_id, from_addr, to_addr):
-
+    """
+    Construct a binary get memory request
+    :param request_id: unique-per-session id for request
+    :param from_addr: start address for memory read
+    :param to_addr: finish address for memory read (inclusive)
+    :return: the binary request as a bytes object
+    """
     # length of request body is fixed for memory get
     # side effects (1), from addr (2), to addr (2), memspace (1), bank_id (2)
     body_length = 1 + 2 + 2 + 1 + 2
 
     # format the request packet, everything is little endian
-    request = struct.pack(">BBIIBBHHBH",
-                          API_START,            # api start: 8 bit
-                          API_VERSION,          # api version 8 bit
-                          body_length,          # body length: 32 bit
-                          request_id,           # request id: 32 bit
-                          CMD_MEMORY_GET,       # command id: 8 bit
-                          MEM_SIDE_FX_NONE,     # side_effects: 8bit
-                          from_addr,            # from_addr: 16 bit
-                          to_addr,              # to_addr: 16 bit
-                          MEM_SPACE_MAIN,       # mem_space: 8 bit
-                          MEM_BANK_CPU)         # bank_id:16 bit
-    return request
+    return struct.pack(">BBIIBBHHBH",
+                       API_START,  # api start: 8 bit
+                       API_VERSION,  # api version 8 bit
+                       body_length,  # body length: 32 bit
+                       request_id,  # request id: 32 bit
+                       CMD_MEMORY_GET,  # command id: 8 bit      <- last byte of header
+                       MEM_SIDE_FX_NONE,  # side_effects: 8bit
+                       from_addr,  # from_addr: 16 bit
+                       to_addr,  # to_addr: 16 bit
+                       MEM_SPACE_MAIN,  # mem_space: 8 bit
+                       MEM_BANK_CPU)  # bank_id:16 bit
 
 
 def cmd_exit(request_id):
     request = struct.pack(">BBIIB",
-                          API_START,            # api start: 8 bit
-                          API_VERSION,          # api version 8 bit
-                          0,                    # body size: 32 bit
-                          request_id,           # request id: 32 bit
-                          CMD_EXIT)             # command id: 8 bit
+                          API_START,  # api start: 8 bit
+                          API_VERSION,  # api version 8 bit
+                          0,  # body size: 32 bit
+                          request_id,  # request id: 32 bit
+                          CMD_EXIT)  # command id: 8 bit
     return request
 
 
@@ -168,14 +173,17 @@ def write_binary_file(data, filename):
     with open(filename, 'wb') as file:
         file.write(data)
 
+
 def hex_n_decimal(value):
     return f"{hex(value)} ({value})"
+
 
 def socket_read_exactly(sockt, n):
     data = sockt.recv(n)
     while len(data) < n:
         data += sockt.recv(n - len(data))
     return data
+
 
 def get_vice_memory_contents_binary(host: str, port: int, from_addr: int, to_addr: int, req_id: int) -> bytes:
     """
@@ -201,31 +209,32 @@ def get_vice_memory_contents_binary(host: str, port: int, from_addr: int, to_add
 def receive_response(sockt, request_id):
     """
     Reads the response from a socket and returns it as a byte array.
-    :param sockt:
-    :param request_id:
-    :return:
+    :param sockt: a socket to receive response from
+    :param request_id: unique id in session for request
+    :return: tuple response_header, response_body
     """
     # Read the response header
     # then we know the body length and we can read the body
 
     response = 1
     body = b''
-    found_response = False   # keep reading until we find a response for a normal request
+    response_header = None
+    found_response = False  # keep reading until we find a response for a normal request
     while not found_response:
         print(f"\nresponse {response} reading {RESPONSE_HEADER_LENGTH} header bytes")
         header = socket_read_exactly(sockt, RESPONSE_HEADER_LENGTH)
         response_header = parse_res_header(header)
-        found_response = resp_req_id != REQ_ID_EVENT
+        found_response = response_header.req_id != REQ_ID_EVENT
         if response_header.body_len > 0:
             body = socket_read_exactly(sockt, response_header.body_len)
             print(f" body: {hex_dump(body)}")
         if found_response and response_header.req_id != request_id:
-            raise ValueError(f"got response for request {resp_req_id} expected {request_id}")
+            raise ValueError(f"response for request {response_header.req_id} expected {request_id}")
         response = response + 1
     # response body format for get memory:
     # length of memory segment: 2 bytes
     # value at memory address from_addr + n for each n: n+1 bytes
-    return body
+    return response_header, body
 
 
 def parse_res_header(header):
@@ -256,6 +265,7 @@ def parse_res_header(header):
 def hex_dump(bs):
     return ' '.join(f'{b:02x}' for b in bs)
 
+
 def main():
     resp = get_vice_memory_contents_binary("127.0.0.1", 6502, 15, 16, 1)
     print(resp)
@@ -263,4 +273,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
