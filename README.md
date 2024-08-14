@@ -17,6 +17,7 @@ Screen memory is at `$1e00` which makes reading the board possible, given that i
 For Sargon
 
 * [ ] investigate binary monitor protocol. The text commands appear to have changed a lot over time and parsing natural language output seems brittle
+* [ ] Q: do we need to set the keyboard buffer size when sending keys? 
 * [ ] read general game state from memory
     * [ ] computer is thinking?
     * [ ] initial title screen (hit F1)
@@ -41,7 +42,6 @@ For Sargon
 * https://github.com/nippur72/vic20-emu
 * https://github.com/rjanicek/vice.js
 * https://github.com/lanceewing/jvic
-* https://github.com/davidbarone/vic20
 * https://github.com/abbruzze/kernal64
 * https://github.com/hotkeysoft/emulators
 * https://github.com/gcasa/VIC20
