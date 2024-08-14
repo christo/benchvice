@@ -16,6 +16,7 @@ Screen memory is at `$1e00` which makes reading the board possible, given that i
 
 For Sargon
 
+* [ ] investigate: vice_monitor asserts the request header length should be 11, I count 12!
 * [ ] investigate binary monitor protocol. The text commands appear to have changed a lot over time and parsing natural language output seems brittle
 * [ ] read general game state from memory
     * [ ] computer is thinking?
