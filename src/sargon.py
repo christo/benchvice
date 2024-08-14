@@ -16,7 +16,7 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 SARGON_PRG = "vic20-sargon-ii-chess/PRG/SargonII-2000.prg"
 XVIC_CUSTOM = f"{SCRIPT_DIR}/../../../other/github.com/drfiemost/vice-emu/install/bin/xvic"
 XVIC_PATH = "xvic"
-XVIC = XVIC_PATH
+XVIC = XVIC_CUSTOM
 
 MON_PORT = 6510
 MON_HOST = "127.0.0.1"
@@ -166,11 +166,9 @@ def coord_square_colour(coord):
     return Colour.WHITE if (coord[0] + coord[1]) % 2 == 0 else Colour.BLACK
 
 def vmon(command):
-    return vmon_basic(command)
-
-def vmon_basic(command):
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.connect((MON_HOST, MON_PORT))
+        s.settimeout(5)
         # TODO ? does this block or do we need to specify a flag to make it block?
         s.sendall(command.encode('utf-8'))
         assert s.getblocking()
@@ -301,6 +299,7 @@ def warp(is_warp):
 
 def await_computer():
     print("waiting for computer")
+    # TODO the following blocks while xvic hangs
     while is_computer_move():
         print(".", end="")
         time.sleep(0.5)
