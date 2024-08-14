@@ -41,7 +41,6 @@ For Sargon
 
 * https://github.com/nippur72/vic20-emu
 * https://github.com/rjanicek/vice.js
-* https://github.com/lanceewing/jvic
 * https://github.com/abbruzze/kernal64
 * https://github.com/hotkeysoft/emulators
 * https://github.com/gcasa/VIC20
