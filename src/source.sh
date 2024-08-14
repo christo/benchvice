@@ -11,6 +11,25 @@ export CHR_RETURN='\x0d'
 export CHR_CURSOR_RIGHT='\x1d'
 export CHR_CURSOR_DOWN='\x11'
 
+alias xvic="$HOME/src/other/github.com/drfiemost/vice-emu/install/bin/xvic"
+
+function sargon_vice() {
+  if [[ $(pgrep xvic) ]]; then
+    echo "xvic already running"
+    exit 1
+  fi
+  xvic -remotemonitor -remotemonitoraddress "$monitor_address" \
+      -binarymonitor \
+      -config "$SCRIPT_DIR/../vice.config" \
+      -memory 8k \
+      -autostartprgmode 1 \
+      "$SCRIPT_DIR/../$sargon_prg" \
+      >"$SCRIPT_DIR/../vice.out.log" &
+}
+
+function kill_xvic() {
+  killall xvic
+}
 
 # sends args as monitor command, results to stdout
 function vmon() {
@@ -40,6 +59,12 @@ function dump_mem_wait() {
   dump_mem "$1"
   hexdump -vC "$1" > "$1.hex"
   sleep 5
+}
+
+function centre_sargon() {
+  shift_right=$(printf "%0.s$CHR_CURSOR_RIGHT" {1..7})
+  shift_down=$(printf "%0.s$CHR_CURSOR_DOWN" {1..10})
+  send_keys "${shift_right}${shift_down}"
 }
 
 # read memory locations holding human colour and current turn colour
