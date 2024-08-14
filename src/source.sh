@@ -6,10 +6,10 @@ export monitor_host="127.0.0.1"
 export monitor_address="ip4://$monitor_host:$monitor_port"
 
 # unprintable character codes for sending to keyboard buffer
-export CHR_F1='\x85'
-export CHR_RETURN='\x0d'
-export CHR_CURSOR_RIGHT='\x1d'
-export CHR_CURSOR_DOWN='\x11'
+export CHR_F1='\\x85'
+export CHR_RETURN='\\x0d'
+export CHR_CURSOR_RIGHT='\\x1d'
+export CHR_CURSOR_DOWN='\\x11'
 
 alias xvic="$HOME/src/other/github.com/drfiemost/vice-emu/install/bin/xvic"
 
@@ -38,7 +38,6 @@ function vmon() {
 
 # sends args as keys
 function send_keys() {
-  # TODO do we need to set the keyboard buffer size?
   vmon "keybuf $*"
 }
 
