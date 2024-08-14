@@ -35,3 +35,17 @@ For Sargon
     * [ ] warp mode? 
 * [x] screenshot
 
+
+## Alternatives to VICE
+
+* https://github.com/nippur72/vic20-emu
+* https://github.com/rjanicek/vice.js
+* https://github.com/lanceewing/jvic
+* https://github.com/davidbarone/vic20
+* https://github.com/abbruzze/kernal64
+* https://github.com/hotkeysoft/emulators
+* https://github.com/gcasa/VIC20
+* https://github.com/lunarum/VIC20-Emulator
+* https://github.com/mrangryhumster/vic20_crude_emulator
+* https://github.com/breqdev/noentiendo
+
