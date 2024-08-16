@@ -23,8 +23,9 @@ For Sargon
     * [ ] initial title screen (hit F1)
     * [ ] Game or Setup prompt
     * [ ] Game: 
-        * [ ] White or Black prompt
-        * [ ] AI level 0-6
+      * [x] Human colour
+      * [x] White or Black prompt
+      * [ ] AI level 0-6
     * [ ] Setup: 
         * to specify a board state from which to play
     * [ ] level of difficulty
