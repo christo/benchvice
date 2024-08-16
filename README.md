@@ -44,7 +44,6 @@ For Sargon
 * https://github.com/abbruzze/kernal64
 * https://github.com/hotkeysoft/emulators
 * https://github.com/gcasa/VIC20
-* https://github.com/lunarum/VIC20-Emulator
 * https://github.com/mrangryhumster/vic20_crude_emulator
 * https://github.com/breqdev/noentiendo
 
