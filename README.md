@@ -16,7 +16,9 @@ Screen memory is at `$1e00` which makes reading the board possible, given that i
 
 For Sargon
 
-* [ ] investigate binary monitor protocol. The text commands appear to have changed a lot over time and parsing natural language output seems brittle
+* [ ] investigate binary monitor protocol. The text commands appear to have changed a lot over time
+and parsing natural language output seems brittle
+  * [ ] try asynchronous socket implementation of `vice_connect.py`
 * [ ] Q: do we need to set the keyboard buffer size when sending keys? 
 * [ ] read general game state from memory
     * [ ] computer is thinking?
