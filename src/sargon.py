@@ -10,14 +10,14 @@ from enum import Enum
 import vice_monitor
 from pathlib import Path
 
-# TODO vice_connect is scuffed
 # from vice_connect import vice_read_mem
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 SARGON_PRG = Path(f"{SCRIPT_DIR}/../vic20-sargon-ii-chess/PRG/SargonII-2000.prg").resolve()
 XVIC_CUSTOM = Path(f"{SCRIPT_DIR}/../../../other/github.com/drfiemost/vice-emu/install/bin/xvic").resolve()
+XVIC_SF = Path(f"{SCRIPT_DIR}/../../../other/vice-emu-sourceforge-svn/vice-emu-code/vice/install/bin/xvic").resolve()
 XVIC_PATH = "xvic"
-XVIC = XVIC_CUSTOM
+XVIC = XVIC_SF
 
 # text monitor
 MON_PORT = 6510
@@ -174,11 +174,15 @@ def coord_square_colour(coord):
     return Colour.WHITE if (coord[0] + coord[1]) % 2 == 0 else Colour.BLACK
 
 
-def vmon(command):
+def vmon_text(command):
+    """
+    Uses a synchronous socket to connect to the text monitor, sendthe given command string returning the response
+    :param command: string as if entered in the text monitor
+    :return: the full formatted text response for the command
+    """
+    print(f"calling vice monitor text socket with: {command}")
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.connect((MON_HOST, MON_PORT))
-        s.settimeout(5)
-        # TODO ? does this block or do we need to specify a flag to make it block?
         s.sendall(command.encode('utf-8'))
         assert s.getblocking()
         data = s.recv(1024)
@@ -186,11 +190,12 @@ def vmon(command):
 
 
 def read_mem(start, finish):
+    print("calling vice_read_mem (binary)")
     return vice_read_mem(host, port, start, finish)
 
 
 def save_mem(filename):
-    return vmon(f"s {filename} 0000 ffff")
+    return vmon_text(f"s {filename} 0000 ffff\n")
 
 
 def send_keys(keys):
@@ -198,7 +203,7 @@ def send_keys(keys):
     Sets the keybuffer of the guest machine to the given string.
     Use c-style hex escapes for non-glyph keys
     """
-    return vmon(f"keybuf {keys}\n")
+    return vmon_text(f"keybuf {keys}\n")
 
 
 def coord_to_pos(coord):
@@ -209,6 +214,7 @@ TL_PIECES = build_tl_pieces(PIECES)
 
 
 def dump_board():
+    print("calling vice_monitor.read_memory 64 times!")
     for r in range(8):
         for f in range(8):
             coord = (f, r)
@@ -222,6 +228,7 @@ def dump_board():
 
 
 def dump_board_mem():
+    print("calling vice_monitor.read_memory 64 times")
     for r in range(8):
         for f in range(8):
             coord = (f, r)
@@ -287,7 +294,7 @@ def start_sargon_vice():
     config_file = Path(f"{SCRIPT_DIR}/../vice.config").resolve()
     if not config_file.exists():
         raise ValueError(f"config file {config_file} does not exist")
-
+    print(f"config file: {config_file}")
     subprocess.Popen([
         XVIC, "-remotemonitor",
         "-remotemonitoraddress", f"ip4://{MON_HOST}:{MON_PORT}",
@@ -303,6 +310,7 @@ def start_sargon_vice():
 
 def read1(addr):
     """ Reads and returns a single byte value from addr """
+    print("calling vice_monitor.read_memory")
     return int(vice_monitor.read_memory(addr, addr).data[0])
 
 
@@ -311,11 +319,11 @@ def is_computer_move():
     If the game has not started, the behaviour is undefined.
     :return: true if the computer is thinking
     """
-    # human colour is 0x15, whos turn is 0x16 so grab both at once:
-    data = vice_monitor.read_memory(0x15, 0x16).data
-    is_human_move = data[0] == data[1]
-    is_cpu = not is_human_move
-    return is_cpu
+    # human colour is 0x15, colour of whose turn is next is 0x16 so grab both at once:
+    print("calling vice_monitor.read_memory")
+    data = vice_monitor.read_memory(0x15, 0x16, False).data
+    # if they are the same, the hunan's move is *next* so computer's move is now!
+    return data[0] == data[1]
 
 
 def warp(is_warp):
@@ -326,10 +334,13 @@ def warp(is_warp):
 def await_computer():
     print("waiting for computer")
     # TODO the following blocks while xvic hangs
-    while is_computer_move():
-        print(".", end="")
-        time.sleep(0.5)
-    print()
+    t = 0
+    sleep(1)
+    while is_computer_move() and t < 10:
+        print(".", end="", flush=True)
+        sleep(25)
+        t = t + 1
+    print("human move now")
 
 
 def get_move_number():
@@ -337,19 +348,18 @@ def get_move_number():
 
 
 def main():
-    if not xvic_running():
-        start_sargon_vice()
-        shift_screen(7, 8)
-        start_game(Colour.WHITE, 2)
-
-        sleep(2)
-    # read_mem(0x15, 0x16)
+    # if not xvic_running():
+    #     start_sargon_vice()
+    print(vmon_text("sfx off\n"))
+    shift_screen(7, 8)
+    sleep(8)
+    start_game(Colour.WHITE, 2)
+    sleep(2)
 
     # dump_board()
     make_move("d2-d4")
 
     await_computer()
-
     make_move("c1-f4")
 
     await_computer()

@@ -8,8 +8,6 @@ from abc import ABC, abstractmethod
 # binary monitor interface with partial command implementation
 # see vice manual section 12 https://vice-emu.sourceforge.io/vice_12.html
 
-# TODO need to make socket connection asynchronous
-
 API_START = 2
 API_VERSION = 2
 

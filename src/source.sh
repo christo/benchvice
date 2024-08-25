@@ -11,21 +11,11 @@ export CHR_RETURN='\\x0d'
 export CHR_CURSOR_RIGHT='\\x1d'
 export CHR_CURSOR_DOWN='\\x11'
 
-alias xvic="$HOME/src/other/github.com/drfiemost/vice-emu/install/bin/xvic"
+export VICE_SRC_SVN="$HOME/src/other/vice-emu-sourceforge-svn/vice-emu-code/vice"
+export VICE_SRC_GH="$HOME/src/other/github.com/drfiemost/vice-emu/"
+alias xvic="$VICE_SRC_SVN/install/bin/xvic"
 
-function sargon_vice() {
-  if [[ $(pgrep xvic) ]]; then
-    echo "xvic already running"
-    exit 1
-  fi
-  xvic -remotemonitor -remotemonitoraddress "$monitor_address" \
-      -binarymonitor \
-      -config "$SCRIPT_DIR/../vice.config" \
-      -memory 8k \
-      -autostartprgmode 1 \
-      "$SCRIPT_DIR/../$sargon_prg" \
-      >"$SCRIPT_DIR/../vice.out.log" &
-}
+
 
 function kill_xvic() {
   killall xvic
