@@ -1,2 +1,4 @@
 vice.out.log
 vice.err.log
+src/__pycache__
+rebuild-vice.log
